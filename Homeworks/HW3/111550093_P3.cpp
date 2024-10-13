@@ -17,6 +17,7 @@ using namespace std;
 
 const int MAX_THREADS = 8;
 const int MAX_ELEMENTS = 1000000;
+const int MAX_JOBS = 16; // Increased from 20 to accommodate all possible jobs
 
 vector<int> input_array;
 vector<vector<int>> sorted_subarrays(8);
@@ -30,7 +31,7 @@ struct Job {
     bool is_merge; // True if it's a merge job, False if it's a bubble sort job
 };
 
-vector<int> job_done(16, 0);
+vector<int> job_done(MAX_JOBS, 0);
 queue<Job> job_queue;  // Change from vector to queue
 
 void bubble_sort(vector<int>& arr, int start, int end) {
@@ -89,18 +90,20 @@ void* worker_thread(void* arg) {
         sem_post(&job_mutex);
         
         if (job.is_merge) {
-            int mid = job.start * job.chunk_size + job.chunk_size / 2;
-            merge(input_array, job.start * job.chunk_size, mid, job.end * job.chunk_size - 1);
+            int mid = job.start + (job.end - job.start) / 2;
+            merge(input_array, job.start, mid, job.end);
         } else {
-            bubble_sort(input_array, job.start * job.chunk_size, (job.end + 1) * job.chunk_size - 1);
+            bubble_sort(input_array, job.start, job.end);
         }
         
         sem_wait(&job_mutex);     
         job_done[job.id] = 1;
-        int neighbor_id = job.id + (job.id & 2 ? -1 : 1);
-        if (job_done[neighbor_id]) {
-            int mergejob_id = job.id >> 1;
-            Job merge_job = {mergejob_id, mergejob_id << 1, mergejob_id << 1 + 1, job.chunk_size, true};
+        int neighbor_id = job.id ^ 1; // XOR with 1 to get the neighbor ID
+        if (job.id < 15 && job_done[neighbor_id]) { // Check if it's not the final merge
+            int parent_id = job.id / 2;
+            int start = min(job.start, job_done[neighbor_id]);
+            int end = max(job.end, job_done[neighbor_id]);
+            Job merge_job = {parent_id, start, end, job.chunk_size * 2, true};
             job_queue.push(merge_job);
         }
         sem_post(&job_mutex);
@@ -142,23 +145,22 @@ int main() {
     handle_input();
 
     for (int n = 1; n <= MAX_THREADS; n++) {
-        // Start timing
-        struct timeval start, stop;
-        gettimeofday(&start, 0);
-
         vector<int> temp_array = input_array; // Copy input array to temp_array for each n
         
         sem_init(&done, 0, 0);
         sem_init(&job_mutex, 0, 1);
         
-        // Initialization: Append 8 bubble sort jobs to job_list
-        int chunk_size = temp_array.size() / 8;
-        Job newjob;
+        // Initialization: Append 8 bubble sort jobs to job_queue
+        int chunk_size = input_array.size() / 8;
         for (int i = 0; i < 8; i++) {
-            newjob = {i + 8, i, i + 1, chunk_size, false};
+            Job newjob = {i + 8, i * chunk_size, (i + 1) * chunk_size - 1, chunk_size, false};
             job_queue.push(newjob);
         }
-        
+
+        // Start timing
+        struct timeval start, stop;
+        gettimeofday(&start, 0);
+
         // Create worker threads
         vector<pthread_t> threads(n);
         for (int i = 0; i < n; i++) {
@@ -168,6 +170,10 @@ int main() {
         // Wait for all threads to finish
         for (int i = 0; i < n; i++) {
             sem_wait(&done);
+        }
+
+        for (int i = 0; i < n; i++) {
+            pthread_join(threads[i], NULL);
         }
         
         gettimeofday(&stop, 0);
@@ -179,6 +185,8 @@ int main() {
 
         sem_destroy(&done);
         sem_destroy(&job_mutex);
+
+        input_array = temp_array;
     }
     
     return 0;
