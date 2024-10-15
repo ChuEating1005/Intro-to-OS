@@ -1,10 +1,15 @@
 #!/bin/bash
 
-python3 test.py
+python3 test.py -N 100000
 echo "Testcase generated"
 g++ -pthread 111550093_P3.cpp -o hw3.out
 echo "Compiled"
-echo ""
-output=$(./hw3.out | tee /dev/tty)
+echo "Running..."
+output=$(./hw3.out)
+echo -e "\nTime: "
+echo "$output"
+echo -e "\nTestcase: "
+python3 result.py
 echo "$output" > performance.txt
+echo -e "\nTime curve:"
 python3 plot.py
