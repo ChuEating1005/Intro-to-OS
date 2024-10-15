@@ -9,6 +9,7 @@ Statement: I am fully aware that this program is not supposed to be posted to a 
 #include <pthread.h>
 #include <semaphore.h>
 #include <vector>
+#include <utility>
 #include <fstream>
 #include <algorithm>
 #include <queue>
@@ -20,8 +21,7 @@ const int MAX_ELEMENTS = 1000000;
 const int MAX_JOBS = 16; // Increased from 20 to accommodate all possible jobs
 
 vector<int> input_array;
-vector<vector<int>> sorted_subarrays(8);
-sem_t done, job_mutex;
+sem_t thread_done, job_mutex;
 
 struct Job {
     int id;
@@ -32,24 +32,35 @@ struct Job {
 };
 
 vector<int> job_done(MAX_JOBS, 0);
+vector<int> job_chunk(MAX_JOBS, 0);
+vector<pair<int, int>> job_range(MAX_JOBS, {0, 0});
 queue<Job> job_queue;  // Change from vector to queue
 
 void bubble_sort(vector<int>& arr, int start, int end) {
-    for (int i = start; i < end; i++) {
+    for (int i = start; i < end + 1; i++) {
+        bool swapped = false;
         for (int j = start; j < end - (i - start); j++) {
             if (arr[j] > arr[j + 1]) {
                 swap(arr[j], arr[j + 1]);
+                swapped = true;
             }
+        }
+        if (!swapped) {
+            break;
         }
     }
 }
 
-void merge(vector<int>& arr, int start, int mid, int end) {
+void merge(vector<int>& arr, int id) {
+    int start = job_range[id*2].first;
+    int end = job_range[id*2+1].second;
+    int mid = job_range[id*2].second;
+
     vector<int> left(arr.begin() + start, arr.begin() + mid + 1);
     vector<int> right(arr.begin() + mid + 1, arr.begin() + end + 1);
     
     int i = 0, j = 0, k = start;
-    
+
     while (i < left.size() && j < right.size()) {
         if (left[i] <= right[j]) {
             arr[k] = left[i];
@@ -76,39 +87,43 @@ void merge(vector<int>& arr, int start, int mid, int end) {
 
 void* worker_thread(void* arg) {
     while (true) {
-        sem_wait(&job_mutex);        
-        /* Critical section: Pop a job from job_queue */
-        if (job_queue.empty()) {
-            sem_post(&job_mutex);
-            sem_post(&done);
-            break;
+        Job job;
+        bool has_job = false;
+
+        sem_wait(&job_mutex);
+        if (!job_queue.empty()) {
+            job = job_queue.front();
+            job_queue.pop();
+            has_job = true;
         }
-        
-        Job job = job_queue.front();  // Get the front job
-        job_queue.pop();  // Remove the front job
-        /* Critical section: End */
         sem_post(&job_mutex);
-        
+
+        if (!has_job) {
+            break; // Exit the loop if no more jobs
+        }
+
         if (job.is_merge) {
-            int mid = job.start + (job.end - job.start) / 2;
-            merge(input_array, job.start, mid, job.end);
+            merge(input_array, job.id);
         } else {
             bubble_sort(input_array, job.start, job.end);
         }
-        
-        sem_wait(&job_mutex);     
+
         job_done[job.id] = 1;
-        int neighbor_id = job.id ^ 1; // XOR with 1 to get the neighbor ID
-        if (job.id < 15 && job_done[neighbor_id]) { // Check if it's not the final merge
-            int parent_id = job.id / 2;
-            int start = min(job.start, job_done[neighbor_id]);
-            int end = max(job.end, job_done[neighbor_id]);
-            Job merge_job = {parent_id, start, end, job.chunk_size * 2, true};
+        
+
+        sem_wait(&job_mutex);
+        int neighbor_id = (job.id & 1) ? job.id - 1 : job.id + 1;
+        if (job.id > 1 && job_done[neighbor_id]) {
+            int parent_id = job.id >> 1;
+            int start = min(job.start, job_range[neighbor_id].first);
+            int end = max(job.end, job_range[neighbor_id].second);
+            Job merge_job = {parent_id, start, end, job_chunk[job.id] + job_chunk[neighbor_id], true};
             job_queue.push(merge_job);
+            job_range[parent_id] = {start, end};
         }
         sem_post(&job_mutex);
-        sem_post(&done);
     }
+    sem_post(&thread_done); // Signal that this thread is done
     return NULL;
 }
 
@@ -144,16 +159,30 @@ int main() {
     
     handle_input();
 
+    vector<int> temp_array = input_array;
     for (int n = 1; n <= MAX_THREADS; n++) {
-        vector<int> temp_array = input_array; // Copy input array to temp_array for each n
-        
-        sem_init(&done, 0, 0);
+        input_array = temp_array;
+        sem_init(&thread_done, 0, 0);
         sem_init(&job_mutex, 0, 1);
-        
+
+        // Reset job_done array
+        fill(job_done.begin(), job_done.end(), 0);
+
         // Initialization: Append 8 bubble sort jobs to job_queue
         int chunk_size = input_array.size() / 8;
+        int remainder = input_array.size() % 8;
+
         for (int i = 0; i < 8; i++) {
-            Job newjob = {i + 8, i * chunk_size, (i + 1) * chunk_size - 1, chunk_size, false};
+            job_chunk[i+8] = chunk_size + (i < remainder ? 1 : 0);
+        }
+        
+        Job newjob;
+        for (int i = 0; i < 8; i++) {
+            if (i == 0)
+                newjob = {i + 8, 0, job_chunk[8] - 1, job_chunk[8], false};
+            else
+                newjob = {i + 8, newjob.end + 1, newjob.end + job_chunk[i+8], job_chunk[i+8], false};
+            job_range[i + 8] = {newjob.start, newjob.end};
             job_queue.push(newjob);
         }
 
@@ -169,7 +198,7 @@ int main() {
         
         // Wait for all threads to finish
         for (int i = 0; i < n; i++) {
-            sem_wait(&done);
+            sem_wait(&thread_done);
         }
 
         for (int i = 0; i < n; i++) {
@@ -179,14 +208,12 @@ int main() {
         gettimeofday(&stop, 0);
         int sec = stop.tv_sec - start.tv_sec, usec = stop.tv_usec - start.tv_usec;
         
-        handle_output(temp_array, n);
+        handle_output(input_array, n);
         
         printf("worker thread #%d, elapsed %.6f ms\n", n, (sec + (usec / 1000000.0)) * 1000.0);
 
-        sem_destroy(&done);
+        sem_destroy(&thread_done);
         sem_destroy(&job_mutex);
-
-        input_array = temp_array;
     }
     
     return 0;
