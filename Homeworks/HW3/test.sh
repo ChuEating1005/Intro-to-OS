@@ -2,7 +2,7 @@
 
 python3 test.py -N 100000
 echo "Testcase generated"
-g++ -pthread 111550093_P3.cpp -o hw3.out
+g++ -pthread hw3_111550093.cpp -o hw3.out
 echo "Compiled"
 echo "Running..."
 output=$(./hw3.out)
