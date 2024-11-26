@@ -87,11 +87,13 @@ void remove_from_free_list(struct block *blk) {
 
 void split_block(struct block *blk, size_t alloc_size) {
     struct block *new_blk = blk + 1 + alloc_size / 32;
+    struct block *next = next_block(blk);
     new_blk->size = blk->size - alloc_size - HEADER_SIZE;
     new_blk->free = 1;
     new_blk->prev_free = NULL;
     new_blk->next_free = NULL;
     new_blk->prev = blk;
+    next->prev = new_blk;
     blk->size = alloc_size;
     add_to_free_list(new_blk);
 }
@@ -180,13 +182,14 @@ void *malloc(size_t size) {
         return NULL;
     }
     else{
-        // If the block is too small, allocate the whole block
-        if (best_fit->size - alloc_size <= 64) {
+        // If the block is exactly the size of the allocation request, remove it from the free list
+        if (best_fit->size - alloc_size == 0) {
             remove_from_free_list(best_fit);
         }
         else {
             remove_from_free_list(best_fit);
             split_block(best_fit, alloc_size);
+           
         }
         return best_fit + 1;
     }   
