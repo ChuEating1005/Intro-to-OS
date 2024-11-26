@@ -31,7 +31,11 @@
 *.exe
 *.out
 *.app
+*.DS_Store
 
 Homeworks/HW2/*.txt
 Homeworks/HW3/*.txt
 Homeworks/HW4/main
+Homeworks/HW5/main
+Homeworks/HW5/*.txt
+
