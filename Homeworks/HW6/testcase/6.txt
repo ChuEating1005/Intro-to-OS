@@ -1,0 +1,4 @@
+#! /bin/bash
+
+cat tarfs/softlink_b.txt
+cat tarfs/softlink/b.txt

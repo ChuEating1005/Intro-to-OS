@@ -1,0 +1,8 @@
+tarfs:
+total 0
+drwxr-xr-x 0 yuiwu yuiwu 0 Nov 18 13:20 softlink
+lrwxrwxrwx 0 yuiwu yuiwu 0 Nov 18 13:32 softlink_b.txt -> ./softlink/b.txt
+
+tarfs/softlink:
+total 0
+-rw-r--r-- 0 yuiwu yuiwu 23 Nov 18 13:28 b.txt
