@@ -12,3 +12,4 @@ Ubuntu 22.04
 | Assignment 2 | Multi-Process Matrix Multiplication using Shared Memory |
 | Assignment 3 | Parallel Merge Sort using Threads                       |
 | Assignment 4 | Custom `malloc()` Replacement Implementation            |
+| Assignment 5 | LRU & CFLRU Cache Implementation                        |
