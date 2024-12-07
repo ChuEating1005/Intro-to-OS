@@ -3,7 +3,7 @@
 - Semester : 2024 Fall
 
 ## Environment
-Ubuntu 22.04
+[Multipass](https://multipass.run/) Ubuntu 22.04.4 LTS Image on Mac M2 Pro
 
 ## Assignments
 |              | Topic                                                   |
@@ -13,3 +13,4 @@ Ubuntu 22.04
 | Assignment 3 | Parallel Merge Sort using Threads                       |
 | Assignment 4 | Custom `malloc()` Replacement Implementation            |
 | Assignment 5 | LRU & CFLRU Page Replacement Policy Cache Implementation |
+| Assignment 6 | Implementing a FUSE Filesystem to Mount a TAR File     |
