@@ -1,6 +1,7 @@
 # Intro-to-OS
-- Instructor : 張立平
-- Semester : 2024 Fall
+> [!NOTE] 
+> - Instructor : 張立平
+> - Semester : 2024 Fall
 
 ## Environment
 [Multipass](https://multipass.run/) Ubuntu 22.04.4 LTS Image on Mac M2 Pro
